@@ -93,7 +93,7 @@ All defaults are overridable via env vars:
 | `VPN_TAG` | `vpn-exit-node` | How the script finds "its" droplet |
 | `VPN_SSH_KEYS` | `ssh` | Comma-separated DigitalOcean key names, MD5 fingerprints, or numeric IDs. Names are resolved via `doctl compute ssh-key list` (token needs `ssh_key:read`). |
 | `VPN_CLOUD_CONFIG` | `./cloud-config.yaml` | Path to the cloud-init file |
-| `VPN_ENABLE_PRIVATE_NETWORKING` | `1` | Set `0` to skip the private VPC NIC |
+| `VPN_ENABLE_PRIVATE_NETWORKING` | `0` | Set `1` only if other droplets in the same region need to reach this one over the private VPC |
 
 Defaults mirror the reference droplet `ubuntu-s-1vcpu-512mb-10gb-ams3`. Example
 override:

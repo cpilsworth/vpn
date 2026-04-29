@@ -23,9 +23,10 @@ VPN_IMAGE="${VPN_IMAGE:-ubuntu-24-04-x64}"
 VPN_TAG="${VPN_TAG:-vpn-exit-node}"
 VPN_SSH_KEYS="${VPN_SSH_KEYS:-ssh}"
 VPN_CLOUD_CONFIG="${VPN_CLOUD_CONFIG:-${SCRIPT_DIR}/cloud-config.yaml}"
-# private_networking matches the reference droplet ubuntu-s-1vcpu-512mb-10gb-ams3.
-# droplet_agent is enabled by default; no flag needed.
-VPN_ENABLE_PRIVATE_NETWORKING="${VPN_ENABLE_PRIVATE_NETWORKING:-1}"
+# Off by default: a standalone exit node has nothing else in its VPC to talk
+# to. Set to 1 if you have other droplets in $VPN_REGION that should reach it
+# over private networking.
+VPN_ENABLE_PRIVATE_NETWORKING="${VPN_ENABLE_PRIVATE_NETWORKING:-0}"
 
 die() { echo "error: $*" >&2; exit 1; }
 
