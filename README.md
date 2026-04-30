@@ -3,16 +3,53 @@
 A script to manage a throwaway DigitalOcean droplet that runs as a [Tailscale](https://tailscale.com) exit node.
 Spin it up when you want VPN, tear it down when you don't.
 
-The droplet is bootstrapped by [`cloud-config.yaml`](./cloud-config.yaml), which:
+## How it works
 
-- installs Tailscale,
-- joins the tailnet with a pre-auth key,
-- advertises itself as an exit node + enables Tailscale SSH,
-- locks the host firewall down so only Tailscale (UDP 41641) and tailnet-only
-  SSH are reachable from the internet.
+Three things combine to give you a VPN with an exit point in a country of
+your choosing:
 
-The [`vpn`](./vpn) script wraps `doctl` so you don't have to remember droplet
-IDs or flags.
+- **DigitalOcean** hosts a small Linux droplet in a region you pick —
+  defaults to `ams3` (Amsterdam, Netherlands), so the IP the internet sees
+  is Dutch. The droplet is the *exit point*.
+- **Tailscale** turns that droplet into a node on your private mesh network
+  ("tailnet") and lets it advertise itself as an *exit node*. Tailscale
+  handles identity, end-to-end encryption (WireGuard under the hood) and NAT
+  traversal, so no manual key juggling.
+- **Your tailnet device** — phone, laptop, anything signed into your
+  Tailscale account — opts in to routing traffic through the exit node.
+  When it does, every outbound packet from that device is tunneled
+  (encrypted) to the droplet, which then sends it out to the open internet
+  from its Amsterdam IP. Sites you visit see a Dutch IP, not yours.
+
+The `vpn` script provisions and destroys the droplet on demand, so you only
+pay (~$0.006/hr) when you actually want VPN. Your tailnet itself stays up
+the whole time and just "sees" the exit node come and go.
+
+```mermaid
+flowchart LR
+    subgraph Tailnet["Your tailnet (encrypted mesh, WireGuard)"]
+        Phone["Your phone<br/>(or laptop / any<br/>tailnet device)"]
+        Droplet["DigitalOcean droplet<br/><b>tailnet-exit-ams</b><br/>region: ams3<br/>(Amsterdam, NL)"]
+    end
+
+    Phone -->|"1. all device traffic,<br/>encrypted, to the exit node"| Droplet
+    Droplet -->|"2. droplet egresses<br/>from its Dutch public IP"| Internet["The open internet<br/>(websites, APIs)<br/>sees a Dutch IP — not yours"]
+
+    Coord["Tailscale<br/>coordination server"] -.->|"identity, key exchange,<br/>NAT traversal<br/>(never sees your traffic)"| Phone
+    Coord -.-> Droplet
+```
+
+## What's in this repo
+
+- [`cloud-config.yaml`](./cloud-config.yaml) — bootstraps the droplet on
+  first boot: installs Tailscale, joins the tailnet with a pre-auth key,
+  advertises itself as an exit node, enables Tailscale SSH, and locks the
+  host firewall down so only Tailscale (UDP 41641) and tailnet-only SSH are
+  reachable from the public internet.
+- [`vpn`](./vpn) — a small bash script that wraps `doctl` so you don't have
+  to remember droplet IDs or flags. `vpn up` / `vpn down` / `vpn status`.
+- [`.github/workflows/vpn.yml`](.github/workflows/vpn.yml) — runs the same
+  script on a GitHub-hosted runner so you can trigger it from your phone.
 
 ## Prereqs
 
