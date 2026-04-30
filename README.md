@@ -27,53 +27,83 @@ You'll need:
 - **A [Tailscale](https://tailscale.com) account** — what makes the droplet
   reachable as an exit node (free tier is fine for personal use). You'll
   generate a pre-auth key from
-  <https://login.tailscale.com/admin/settings/keys> when setting up secrets
-  (see [Tailscale auth key](#tailscale-auth-key-kept-out-of-git) below).
+  <https://login.tailscale.com/admin/settings/keys> when setting up
+  [Secrets](#secrets) below.
 - **An SSH key registered with DigitalOcean** named `ssh`, if you want one
   baked into the droplet for emergency console-less recovery. Optional —
   the cloud-config enables Tailscale SSH, which is enough for everything.
 
-Then install and authenticate the CLI:
+Then install the CLI:
 
 ```bash
 brew install doctl
-doctl auth init           # paste your DigitalOcean token
-doctl compute droplet list   # confirm it works (lists your droplets)
 ```
 
-### Tailscale auth key (kept out of git)
+(It's used by both the local script and the GitHub Actions workflow. See the
+[Secrets](#secrets) section below for authenticating it.)
 
-The committed [`cloud-config.yaml`](./cloud-config.yaml) contains a placeholder,
-not a real key:
+## Secrets
+
+The script needs two secrets:
+
+- **DigitalOcean API token** — used by `doctl` to create and destroy the
+  droplet. Generate at <https://cloud.digitalocean.com/account/api/tokens>
+  with `droplet:read,create,delete` scopes. Add `ssh_key:read` if you want
+  the script to resolve SSH keys by name (see `VPN_SSH_KEYS` in
+  [Configuration](#configuration)).
+- **Tailscale pre-auth key** — substituted into the cloud-config at runtime
+  so the droplet joins your tailnet on first boot. Generate at
+  <https://login.tailscale.com/admin/settings/keys>. Recommended flags:
+  **reusable** (one key works across many spin-ups) and **ephemeral**
+  (destroyed droplets fall out of your device list automatically).
+
+The committed [`cloud-config.yaml`](./cloud-config.yaml) only contains a
+placeholder for the Tailscale key:
 
 ```yaml
 --auth-key=__TS_AUTHKEY__
 ```
 
-`vpn up` substitutes the real key into a tempfile at create time. The script
-finds the key via, in order:
+so the repo is safe to push to a public GitHub. The real values are supplied
+at runtime — locally via `doctl` config + macOS Keychain, or remotely via
+GitHub Actions Secrets.
 
-1. `$TS_AUTHKEY` env var
-2. macOS Keychain item named `vpn-tailscale-authkey` (override with
-   `VPN_AUTHKEY_KEYCHAIN_ITEM`)
+### Local setup (running `./vpn` from your laptop)
 
-Recommended setup using Keychain (works for both initial install and key
+**DigitalOcean token.** `doctl` stores it in its own config file:
+
+```bash
+doctl auth init             # paste the token when prompted
+doctl compute droplet list  # confirm it works
+```
+
+**Tailscale key.** The script reads `$TS_AUTHKEY` from your env, falling back
+to a macOS Keychain item named `vpn-tailscale-authkey` (overridable via
+`VPN_AUTHKEY_KEYCHAIN_ITEM`). Keychain is preferred so the key never lands in
+your shell history. The same command serves both initial install and key
 rotation — `-U` updates an existing entry, and omitting the value after `-w`
-makes `security` prompt for it interactively so the key never lands in your
-shell history):
+prompts interactively:
 
 ```bash
 security add-generic-password -U -s vpn-tailscale-authkey -a "$USER" -w
 # (you'll be prompted twice: enter the tskey-auth-... key, then confirm)
 ```
 
-Generate the key in the Tailscale admin console at
-<https://login.tailscale.com/admin/settings/keys>. Recommended flags:
-**reusable** (so the same key works across many spin-ups) and **ephemeral**
-(so old droplets disappear from your device list automatically when destroyed).
+### GitHub Actions setup (running the workflow remotely)
 
-This means the repo is safe to push to a public GitHub — the cloud-config
-contains only the placeholder.
+Both secrets are stored in the repo as encrypted GitHub Actions Secrets — only
+decrypted into the runner's env at job time, never logged, and not visible to
+non-admin collaborators.
+
+In the repo on github.com:
+
+1. **Settings → Secrets and variables → Actions → New repository secret**.
+2. Add `DIGITALOCEAN_ACCESS_TOKEN` with the DigitalOcean token value.
+3. Add `TS_AUTHKEY` with the Tailscale pre-auth key value.
+
+The workflow file [`.github/workflows/vpn.yml`](.github/workflows/vpn.yml)
+references these by name. Confirm it works once from the GitHub UI:
+**Actions → vpn → Run workflow → action: status**.
 
 ## Usage
 
@@ -122,22 +152,8 @@ VPN_REGION=fra1 VPN_SIZE=s-1vcpu-1gb ./vpn up
 
 [`.github/workflows/vpn.yml`](.github/workflows/vpn.yml) lets you run
 `./vpn up|down|status` on a GitHub-hosted runner on demand. One-tap from an
-iOS Shortcut, no always-on box of your own.
-
-### One-time setup
-
-1. Push this repo to a **private** GitHub repository (the cloud-config only
-   contains the placeholder, but a private repo is still cleaner).
-2. Add two repository secrets at `Settings → Secrets and variables → Actions`:
-   - `DIGITALOCEAN_ACCESS_TOKEN` — needs scopes `droplet:read`, `droplet:create`,
-     `droplet:delete`. Generate at
-     <https://cloud.digitalocean.com/account/api/tokens>.
-   - `TS_AUTHKEY` — your Tailscale pre-auth key. Use a **reusable + ephemeral**
-     key from <https://login.tailscale.com/admin/settings/keys> so the runner
-     can spin up a fresh node every time without the key burning out, and old
-     droplets fall out of the device list automatically.
-3. Confirm it works once from the GitHub UI: `Actions → vpn → Run workflow →
-   action: status`.
+iOS Shortcut, no always-on box of your own. Requires the two GitHub Actions
+Secrets from the [Secrets](#secrets) section above.
 
 ### Trigger from the GitHub mobile app
 
