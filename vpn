@@ -104,10 +104,13 @@ cmd_up() {
     return 0
   fi
 
-  local key rendered
+  # `rendered` is intentionally not `local` so the EXIT trap below — which
+  # fires after this function returns — can still see it. Combined with the
+  # `${rendered:-}` expansion in the trap, this stays safe under `set -u`.
+  local key
   key="$(load_authkey)"
   rendered="$(mktemp -t vpn-cloud-config.XXXXXX)"
-  trap 'rm -f "$rendered"' EXIT
+  trap 'rm -f "${rendered:-}"' EXIT
   awk -v k="$key" '{gsub(/__TS_AUTHKEY__/, k); print}' "$VPN_CLOUD_CONFIG" > "$rendered"
   if grep -q '__TS_AUTHKEY__' "$rendered"; then
     die "placeholder __TS_AUTHKEY__ still present after rendering — check $VPN_CLOUD_CONFIG"
