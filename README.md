@@ -103,6 +103,55 @@ override:
 VPN_REGION=fra1 VPN_SIZE=s-1vcpu-1gb ./vpn up
 ```
 
+## Triggering from your phone (GitHub Actions)
+
+[`.github/workflows/vpn.yml`](.github/workflows/vpn.yml) lets you run
+`./vpn up|down|status` on a GitHub-hosted runner on demand. One-tap from an
+iOS Shortcut, no always-on box of your own.
+
+### One-time setup
+
+1. Push this repo to a **private** GitHub repository (the cloud-config only
+   contains the placeholder, but a private repo is still cleaner).
+2. Add two repository secrets at `Settings → Secrets and variables → Actions`:
+   - `DIGITALOCEAN_ACCESS_TOKEN` — needs scopes `droplet:read`, `droplet:create`,
+     `droplet:delete`. Generate at
+     <https://cloud.digitalocean.com/account/api/tokens>.
+   - `TS_AUTHKEY` — your Tailscale pre-auth key. Use a **reusable + ephemeral**
+     key from <https://login.tailscale.com/admin/settings/keys> so the runner
+     can spin up a fresh node every time without the key burning out, and old
+     droplets fall out of the device list automatically.
+3. Confirm it works once from the GitHub UI: `Actions → vpn → Run workflow →
+   action: status`.
+
+### Trigger from the GitHub mobile app
+
+`Actions` tab → `vpn` workflow → `Run workflow` → choose `up` / `down` /
+`status`. Works but takes several taps.
+
+### Trigger from an iOS Shortcut (one tap)
+
+Create a shortcut with a single **Get Contents of URL** action:
+
+- URL: `https://api.github.com/repos/<USER>/<REPO>/actions/workflows/vpn.yml/dispatches`
+- Method: `POST`
+- Headers:
+  - `Authorization`: `Bearer <FINE_GRAINED_PAT>`
+  - `Accept`: `application/vnd.github+json`
+  - `X-GitHub-Api-Version`: `2022-11-28`
+- Request body (JSON):
+  ```json
+  { "ref": "main", "inputs": { "action": "up" } }
+  ```
+
+Make a fine-grained personal access token at
+<https://github.com/settings/personal-access-tokens> scoped to **only this repo**
+with the `Actions: read and write` permission. Duplicate the shortcut for
+`up` / `down` / `status` and pin them to your home screen.
+
+The runner's job log shows the droplet's public IP. To read it from the phone,
+use the GitHub mobile app or hit the GitHub REST API for the latest run.
+
 ## Why "destroy" instead of "stop"
 
 DigitalOcean **bills powered-off droplets at the same rate as running ones** —
