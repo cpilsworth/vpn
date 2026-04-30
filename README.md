@@ -185,33 +185,3 @@ which is fine for a personal VPN.
 If you'd rather keep the disk around (faster restart, fixed IP), the
 alternatives are: snapshot + destroy + recreate from snapshot (cheap, slow),
 or reserve a static IP separately. Out of scope for this script.
-
-## Notes & gotchas
-
-- **The filename is arbitrary, but the first line matters.** Cloud-init
-  identifies the file by its `#cloud-config` magic header on line 1, not by
-  its filename. Don't remove that line.
-
-- **Rotate the original key before pushing.** The first version of
-  `cloud-config.yaml` in your local working tree had a real `tskey-auth-...`
-  in plaintext. Even though the placeholder version is what gets committed,
-  you should still treat the original key as compromised and revoke it in
-  the Tailscale admin console — anywhere that string was pasted (clipboard
-  history, scrollback, this Claude Code session) is a leak vector.
-
-- **`vpn up` is idempotent by tag.** If a droplet with `VPN_TAG` already
-  exists, it just prints the IP — it won't create a duplicate. So if you
-  want a fresh one, `vpn down && vpn up`.
-
-- **DigitalOcean's `--ssh-keys` flag only accepts IDs or MD5 fingerprints**,
-  not names. The script works around this by calling `doctl compute ssh-key
-  list` and resolving the name itself, but that requires the API token to
-  include the `ssh_key:read` scope. If your token doesn't (you'll get a 403
-  on `doctl compute ssh-key list`), pass the fingerprint directly:
-
-  ```bash
-  # compute MD5 fingerprint locally — matches what DigitalOcean stores
-  ssh-keygen -E md5 -lf ~/.ssh/id_ed25519.pub | awk '{print $2}' | sed 's/MD5://'
-  # then:
-  VPN_SSH_KEYS=aa:bb:cc:... ./vpn up
-  ```
