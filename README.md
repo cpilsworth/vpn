@@ -70,7 +70,7 @@ You'll need:
   baked into the droplet for emergency console-less recovery. Optional —
   the cloud-config enables Tailscale SSH, which is enough for everything.
 
-Then install the CLI:
+For local setup, you might want to install the cli:
 
 ```bash
 brew install doctl
